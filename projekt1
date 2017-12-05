@@ -1,0 +1,64 @@
+#!/usr/bin/bash
+#wzorzec -opcje file file...
+
+
+argArray=( "$@" ) #inicjalizacja tablicy argumentow
+pattern=${argArray[0]}
+
+#echo elementy
+#echo ${#argArray[@]} # liczba elementow
+
+
+#co jest czym----------------------------
+liczbaElem=${#argArray[@]}
+tabOpcje=()
+tabPliki=()
+
+for(( i=1; i<$liczbaElem; i++ )); do
+	#echo cos
+	if [ -f ${argArray[$i]} ]; then
+		#echo ${argArray[$i]}
+		#echo plik
+		tabPliki+=(${argArray[$i]})
+	else
+		#echo ${argArray[$i]}
+		#echo nie plik
+		tabOpcje+=(${argArray[$i]})
+	fi
+done
+
+echo -----wydruk kontrolny----------
+echo pliki:
+echo ${tabPliki[@]}
+echo opcje
+echo ${tabOpcje[@]}
+echo -------------------------------
+
+#spr czy podano wszystko co potrzeba
+
+if [ ${#tabPliki[@]} == 0 ];then
+	echo nie podano plikow
+	echo wzorzec -opcje file file...
+fi
+if [ ${#tabOpcje[@]} == 0 ];then
+	echo nie podano opcji
+	echo wzorzec -opcje file file...
+fi
+#----------------------------------------
+
+
+#liczenie linii w ktorych jest wzorzec
+function liczLinie {
+	touch plikDoLiczeniaLinii
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/p" ${tabPliki[$i]} >> plikDoLiczeniaLinii
+	done
+
+	wc -l < plikDoLiczeniaLinii
+	rm plikDoLiczeniaLinii
+}
+
+
+
+liczLinie
