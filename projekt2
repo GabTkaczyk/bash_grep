@@ -1,0 +1,147 @@
+#!/usr/bin/bash
+#wzorzec -opcje file file...
+
+
+argArray=( "$@" ) #inicjalizacja tablicy argumentow
+pattern=${argArray[0]}
+
+#echo elementy:
+#echo ${#argArray[@]} # liczba elementow
+
+
+#sprawdzenie argumentow----------------------------
+#paczymy 2 arg (opcje) i spr czy to sa takie opcje przewidziane
+	#ale najpierw zmienne zeby wiedziec pozniej czy cos wykonywac
+	liczLinie=false #l
+	nazwyPlikow=false #n
+	brakOutput=false #q
+	ignoreCase=false #i
+	caleSlowa=false #w
+
+opcje=${argArray[1]}
+dlOpcji=${#opcje}
+
+if [ $dlOpcji -lt 2 ];then
+	echo nie podano opcji \(poprzedz opcje myslnikiem\)
+	exit
+fi
+
+for(( i=1; i<$dlOpcji; i++ )); do
+	if [ ${opcje:$i:1} == "l" ];then
+		liczLinie=true
+	elif [ ${opcje:$i:1} == "n" ];then
+		nazwyPlikow=true
+	elif [ ${opcje:$i:1} == "q" ];then
+		brakOutput=true
+	elif [ ${opcje:$i:1} == "i" ];then
+		ignoreCase=true
+	elif [ ${opcje:$i:1} == "w" ];then
+		caleSlowa=true
+	else
+		echo brak opcji ${opcje:$i:1}
+		exit
+	fi
+done
+
+#spr czy prawda
+#if $liczLinie ;then
+#	echo licz prawda
+#fi
+
+#teraz spr pliki- - - - - - 
+
+
+liczbaElem=${#argArray[@]}
+tabPliki=()
+
+for(( i=2; i<$liczbaElem; i++ )); do
+
+	if [ -f ${argArray[$i]} ]; then
+		tabPliki+=(${argArray[$i]})
+	else
+		echo plik ${argArray[$i]} nie istnieje
+		exit
+	fi
+done
+
+#echo -----wydruk kontrolny----------
+#echo pliki:
+#echo ${tabPliki[@]}
+#echo -------------------------------
+
+#spr czy podano w ogole jakies pliki
+
+if [ ${#tabPliki[@]} == 0 ];then
+	echo nie podano plikow
+	echo wzorzec -opcje plik1 plik2...
+	exit
+fi
+#----------------------------------------
+
+#liczenie linii w ktorych jest wzorzec
+function liczLinie {
+	touch plikDoLiczeniaLinii
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/p" ${tabPliki[$i]} >> plikDoLiczeniaLinii
+	done
+
+	wc -l < plikDoLiczeniaLinii
+	rm plikDoLiczeniaLinii
+}
+#-----------------------------------------
+
+function ignorecase {
+echo loool
+touch plikDoLiczeniaLiniiIgnorecase
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/Ip" ${tabPliki[$i]} >> plikDoLiczeniaLiniiIgnorecase
+	done
+
+	wc -l < plikDoLiczeniaLiniiIgnorecase
+	rm plikDoLiczeniaLiniiIgnorecase
+}
+#------------------------------------------
+
+function wholeWord {
+odKiedy=1
+dlWzoru=${#pattern}
+spacja=" "
+przedWyrazem=1
+
+for (( i=0; i<${#tabPliki[@]}; i++ )); do
+
+	while read -r line #<start pelta po pliku>
+	do
+		#echo "czyta linie: $line"
+		index=$(awk -v linia="$line" -v subs="$pattern" \
+		'BEGIN {print ret=index(linia, subs)}')
+
+		if [ "$index" != 0 ]; then #niech szuka tylko w tych liniach co znalazlo
+			#czy przed tym cos jest
+			przedWyrazem=$(($index-2))
+			#wzor jest poczatkiem linii lub przed wyr jest spacja
+			if [ "$przedWyrazem" -lt 0 ] ||
+				[ "${line:$przedWyrazem:1}" == "$spacja" ];then
+				#echo "w linii $line jest poczatkiem slowa"
+	
+				#czy znak po tym to spacja/enter
+				odKiedy=$(($index+$dlWzoru-1))
+	
+				#echo "znak po tym:${line:$odKiedy:1}"
+				if [ "${line:$odKiedy:1}" == "$spacja" ] || 
+					[ "$odKiedy" == "${#line}" ];then #slowo konczy linie enter)
+					echo "w linii $line znalazlo wzor"
+				fi
+				# </czy spacja enter>
+			fi
+		fi	
+	
+	done < ${tabPliki[$i]} #</petla po pliku
+done # </petla po tabPliki
+}
+#---MAIN----
+ignorecase
+#liczLinie
+#wholeWord
