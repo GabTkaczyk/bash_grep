@@ -1,0 +1,397 @@
+#!/usr/bin/bash
+#wzorzec -opcje file file...
+
+argArray=( "$@" )
+
+#inicjalizacja tablicy argumentow
+pattern=${argArray[0]}
+
+#sprawdzenie argumentow----------------------------
+#paczymy 2 arg (opcje) i spr czy to sa takie opcje przewidziane
+	#ale najpierw zmienne zeby wiedziec pozniej czy cos wykonywac
+	liczLinie=false #l
+	nazwyPlikow=false #n
+	brakOutput=false #q
+	ignoreCase=false #i
+	caleSlowa=false #w
+
+opcje=${argArray[1]}
+dlOpcji=${#opcje}
+
+if [ $dlOpcji -lt 2 ];then
+	echo nie podano opcji
+	echo "podaj <szukana fraze> <opcje poprzedzone jednym myslnikiem> <plik1> <plik2> ..."
+	echo "liczenie linii -l"
+	echo "wyswietlanie nazw plikow -n"
+	echo "brak wyswietlania wyniku -q"
+	echo "ingorowanie wielkosci znakow - i"
+	echo "wyszukiwanie calych slow -w"
+	exit
+fi
+
+for(( i=1; i<$dlOpcji; i++ )); do
+	if [ ${opcje:$i:1} == "l" ];then
+		liczLinie=true
+	elif [ ${opcje:$i:1} == "n" ];then
+		nazwyPlikow=true
+	elif [ ${opcje:$i:1} == "q" ];then
+		brakOutput=true
+	elif [ ${opcje:$i:1} == "i" ];then
+		ignoreCase=true
+	elif [ ${opcje:$i:1} == "w" ];then
+		caleSlowa=true
+	else
+		echo brak opcji ${opcje:$i:1}
+		echo "podaj <szukana fraze> <opcje poprzedzone jednym myslnikiem> <plik1> <plik2> ..."
+		echo "liczenie linii -l"
+		echo "wyswietlanie nazw plikow -n"
+		echo "brak wyswietlania wyniku -q"
+		echo "ingorowanie wielkosci znakow - i"
+		echo "wyszukiwanie calych slow -w"
+		exit
+	fi
+done
+
+#teraz spr pliki- - - - - - 
+liczbaElem=${#argArray[@]}
+tabPliki=()
+
+for(( i=2; i<$liczbaElem; i++ )); do
+
+	if [ -f ${argArray[$i]} ]; then
+		tabPliki+=(${argArray[$i]})
+	else
+		echo plik ${argArray[$i]} nie istnieje
+		exit
+	fi
+done
+
+#spr czy podano w ogole jakies pliki
+if [ ${#tabPliki[@]} == 0 ];then
+	echo nie podano plikow
+	echo "podaj <szukana fraze> <opcje poprzedzone jednym myslnikiem> <plik1> <plik2> ..."
+	exit
+fi
+#------------------------------------------
+function toUpperFileFunction(){
+linia=""
+touch toUpperFile
+echo -n "" > toUpperFile
+while read -r line #<start pelta po pliku>
+	do
+		linia=$(echo "$line" | tr '[:upper:]' '[:lower:]')
+		echo $linia >> toUpperFile
+	done < "$1" 
+}
+#------------------------------------------
+function wholeWord() {
+odKiedy=1
+dlWzoru=${#pattern}
+spacja=" "
+przedWyrazem=1
+nazwaBiezacegoPliku=""
+liczba=0
+
+lowerPattern=$(echo "$pattern" | tr '[:upper:]' '[:lower:]')
+argument=$1
+touch plikWholeWord
+
+	while read -r line #<start pelta po pliku>
+	do
+		index=$(awk -v linia="$line" -v subs="$lowerPattern" \
+		'BEGIN {print ret=index(linia, subs)}')
+
+		if [ "$index" != 0 ]; then #niech szuka tylko w tych liniach co znalazlo
+			#czy przed tym cos jest
+			przedWyrazem=$(($index-2))
+			#wzor jest poczatkiem linii lub przed wyr jest spacja
+			if [ "$przedWyrazem" -lt 0 ] ||
+				[ "${line:$przedWyrazem:1}" == "$spacja" ];then
+				#echo "w linii $line jest poczatkiem slowa"
+	
+				#czy znak po tym to spacja/enter
+				odKiedy=$(($index+$dlWzoru-1))
+	
+				#echo "znak po tym:${line:$odKiedy:1}"
+				if [ "${line:$odKiedy:1}" == "$spacja" ] || 
+					[ "$odKiedy" == "${#line}" ];then #slowo konczy linie enter)
+
+					echo $line >> plikWholeWord
+				fi
+				# </czy spacja enter>
+			fi
+		fi	
+	done < "$argument" #</petla po pliku
+return
+}
+#---MAIN----
+if [ "$caleSlowa" = true ] && [ "$ignoreCase" = false ] && [ "$nazwyPlikow" = false ] && [ "$liczLinie" = false ]; then	
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		wholeWord ${tabPliki[$i]}
+	done #petla po plikach
+
+	if [ "$brakOutput" = true ]; then
+		if [ ! -s plikWholeWord ]; then
+			rm plikWholeWord
+			exit 0
+		fi
+		rm plikWholeWord
+		exit
+	fi
+	cat plikWholeWord
+	rm plikWholeWord
+	exit
+fi
+
+
+if [ "$caleSlowa" = true ] && [ "$ignoreCase" = true ] ; then
+ilosc=0
+temp=0
+lowerPattern=$(echo "$pattern" | tr '[:upper:]' '[:lower:]')
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		
+		toUpperFileFunction ${tabPliki[$i]}
+		wholeWord toUpperFile		#paczenie czy cale slowo i generowanie pliku plikWholeWord
+		
+		if [ "$nazwyPlikow" = true ] && [ "$liczLinie" = true ];then
+			ilosc=`wc -l < plikWholeWord`
+			if [ "$brakOutput" = true ]; then
+				if [ ! -s plikWholeWord ]; then
+					rm plikWholeWord
+					rm toUpperFile
+					exit 0
+				fi
+				rm plikWholeWord
+				rm toUpperFile
+				exit
+			fi
+			echo ${tabPliki[$i]} ":" $ilosc
+			echo -n "" > plikWholeWord
+		fi
+		if [ "$nazwyPlikow" = false ] && [ "$liczLinie" = true  ];then
+			temp=`wc -l < plikWholeWord`
+			ilosc=$((ilosc + temp))
+			echo -n "" > plikWholeWord
+		fi
+		if [ "$nazwyPlikow" = true ] && [ "$liczLinie" = false ];then
+			if [ "$brakOutput" = true ]; then
+				if [ ! -s plikWholeWord ]; then
+					rm plikWholeWord
+					rm toUpperFile
+					exit 0
+				fi
+				rm plikWholeWord
+				rm toUpperFile
+				exit
+			fi
+
+			echo ${tabPliki[$i]} ":"
+			cat plikWholeWord
+			echo -n "" > plikWholeWord
+		fi
+	done #petla po plikach
+	
+	#wywalanie wynikow:
+	if [ "$nazwyPlikow" = false ] && [ "$liczLinie" = true  ];then
+		if [ "$brakOutput" = true ]; then
+			if [ $ilosc != 0 ]; then
+				rm plikWholeWord
+				rm toUpperFile
+				exit 0
+			fi
+			rm plikWholeWord
+			rm toUpperFile
+			exit
+		fi
+		echo $ilosc
+	fi
+	if [ "$nazwyPlikow" = false ] && [ "$liczLinie" = false ];then
+		if [ "$brakOutput" = true ]; then
+			if [ ! -s plikWholeWord ]; then
+				rm plikWholeWord
+				rm toUpperFile
+				exit 0
+			fi
+			rm plikWholeWord
+			rm toUpperFile
+			exit
+		fi
+		cat plikWholeWord	
+	fi
+	rm plikWholeWord
+	rm toUpperFile
+	exit
+fi
+if [ "$caleSlowa" = true ] && [ "$nazwyPlikow" = true ] ; then
+for (( i=0; i<${#tabPliki[@]}; i++ )); do
+	wholeWord ${tabPliki[$i]}		#paczenie czy cale slowo i generowanie pliku plikWholeWord
+	if [ "$brakOutput" = true ]; then
+		if [ ! -s plikWholeWord ]; then
+			rm plikWholeWord
+			exit 0
+		fi
+		rm plikWholeWord
+		exit
+	fi
+	echo ${tabPliki[$i]} ":"
+	cat plikWholeWord
+	echo -n "" > plikWholeWord
+done #petla po plikach
+rm plikWholeWord
+exit
+fi
+
+if [ "$ignoreCase" = true ] && [ "$nazwyPlikow" = false ] && [ "$liczLinie" = false ]; then
+	touch plikDoLiczeniaLiniiIgnorecase
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/Ip" ${tabPliki[$i]} >> plikDoLiczeniaLiniiIgnorecase
+	done
+	if [ "$brakOutput" = true ]; then
+		if [ ! -s plikDoLiczeniaLiniiIgnorecase ]; then
+			rm plikDoLiczeniaLiniiIgnorecase
+			exit 0
+		fi
+		rm plikDoLiczeniaLiniiIgnorecase
+		exit
+	fi
+	cat plikDoLiczeniaLiniiIgnorecase
+	rm plikDoLiczeniaLiniiIgnorecase
+	exit
+fi
+if [ "$ignoreCase" = true ]; then
+ilosc=0
+	touch plikDoLiczeniaLiniiIgnorecase
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/Ip" ${tabPliki[$i]} >> plikDoLiczeniaLiniiIgnorecase
+
+		if [ "$nazwyPlikow" = true ] && [ "$liczLinie" = true ]; then
+			ilosc=`wc -l < plikDoLiczeniaLiniiIgnorecase`
+
+			if [ "$brakOutput" = true ]; then
+				if [ $ilosc != 0 ]; then
+					rm plikDoLiczeniaLiniiIgnorecase
+					exit 0
+				fi
+				rm plikDoLiczeniaLiniiIgnorecase
+				exit
+			fi
+
+			echo ${tabPliki[$i]} ":" $ilosc
+			echo -n "" > plikDoLiczeniaLiniiIgnorecase
+		fi
+		if [ "$nazwyPlikow" = true ] && [ "$liczLinie" = false ]; then
+			if [ "$brakOutput" = true ]; then
+				if [ ! -s plikDoLiczeniaLiniiIgnorecase ]; then
+					rm plikDoLiczeniaLiniiIgnorecase
+					exit 0
+				fi
+				rm plikDoLiczeniaLiniiIgnorecase
+				exit
+			fi
+
+			echo ${tabPliki[$i]} ":"
+			cat plikDoLiczeniaLiniiIgnorecase
+			echo -n "" > plikDoLiczeniaLiniiIgnorecase
+		fi
+	done
+	if [ "$nazwyPlikow" = false ] && [ "$liczLinie" = true ]; then
+		ilosc=`wc -l < plikDoLiczeniaLiniiIgnorecase`
+		if [ "$brakOutput" = true ]; then
+			if [ $ilosc != 0 ]; then
+				rm plikDoLiczeniaLiniiIgnorecase
+				exit 0
+			fi
+			rm plikDoLiczeniaLiniiIgnorecase
+			exit
+		fi
+		echo $ilosc
+	fi
+	rm plikDoLiczeniaLiniiIgnorecase
+	exit
+fi
+if [ "$nazwyPlikow" = true ] && [ "$liczLinie" = true ]; then
+	touch plikDoLiczeniaLinii
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/p" ${tabPliki[$i]} >> plikDoLiczeniaLinii
+		ilosc=`wc -l < plikDoLiczeniaLinii`
+		if [ "$brakOutput" = true ]; then
+			if [ $ilosc != 0 ]; then
+				rm plikDoLiczeniaLinii
+				exit 0
+			fi
+			rm plikDoLiczeniaLinii
+			exit
+		fi
+		echo ${tabPliki[$i]} ":" $ilosc
+		echo -n "" > plikDoLiczeniaLinii
+	done
+	rm plikDoLiczeniaLinii
+	exit
+fi
+if [ "$nazwyPlikow" = true ] && [ "$liczLinie" = false ]; then
+	touch plikDoLiczeniaLinii
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/p" ${tabPliki[$i]} >> plikDoLiczeniaLinii
+
+		if [ "$brakOutput" = true ]; then
+			if [ ! -s plikDoLiczeniaLinii ]; then
+				rm plikDoLiczeniaLinii
+				exit 0
+			fi
+			rm plikDoLiczeniaLinii
+			exit
+		fi
+		echo ${tabPliki[$i]} ":"
+		cat plikDoLiczeniaLinii
+		echo -n "" > plikDoLiczeniaLinii
+	done
+	rm plikDoLiczeniaLinii
+	exit
+fi
+if [ "$caleSlowa" = true ] && [ "$liczLinie" = true ] && [ "$nazwyPlikow" = false ] && [ "$ignoreCase" = false ]; then
+touch plikWholeWord
+ilosc=0
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		wholeWord ${tabPliki[$i]}
+	done
+	ilosc=`wc -l < plikWholeWord`
+	if [ "$brakOutput" = true ]; then
+			if [ $ilosc != 0 ]; then
+				rm plikWholeWord
+				exit 0
+			fi
+			rm plikWholeWord
+			exit
+		fi
+	echo $ilosc
+rm plikWholeWord
+exit
+fi
+
+if [ "$nazwyPlikow" = false ] && [ "$liczLinie" = true ] && [ "$caleSlowa" = false ] && [ "$ignoreCase" = false ]; then
+liczba=0
+	touch plikDoLiczeniaLinii
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/p" ${tabPliki[$i]} >> plikDoLiczeniaLinii
+	done
+	liczba=`wc -l < plikDoLiczeniaLinii`
+	if [ "$brakOutput" = true ]; then
+		if [ $liczba != 0 ]; then
+			rm plikDoLiczeniaLinii
+			exit 0
+		fi
+		rm plikDoLiczeniaLinii
+		exit
+	fi
+	echo $liczba
+
+	rm plikDoLiczeniaLinii
+	exit
+fi
