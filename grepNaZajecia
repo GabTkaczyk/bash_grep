@@ -18,16 +18,16 @@ pattern=${argArray[0]}
 opcje=${argArray[1]}
 dlOpcji=${#opcje}
 
-if [ $dlOpcji -lt 2 ];then
-	echo nie podano opcji
-	echo "podaj <szukana fraze> <opcje poprzedzone jednym myslnikiem> <plik1> <plik2> ..."
-	echo "liczenie linii -l"
-	echo "wyswietlanie nazw plikow -n"
-	echo "brak wyswietlania wyniku -q"
-	echo "ingorowanie wielkosci znakow - i"
-	echo "wyszukiwanie calych slow -w"
-	exit
-fi
+#if [ $dlOpcji -lt 2 ];then
+	#echo nie podano opcji
+	#echo "podaj <szukana fraze> <opcje poprzedzone jednym myslnikiem> <plik1> <plik2> ..."
+	#echo "liczenie linii -l"
+	#echo "wyswietlanie nazw plikow -n"
+	#echo "brak wyswietlania wyniku -q"
+	#echo "ingorowanie wielkosci znakow - i"
+	#echo "wyszukiwanie calych slow -w"
+	#exit
+#fi
 
 for(( i=1; i<$dlOpcji; i++ )); do
 	if [ ${opcje:$i:1} == "l" ];then
@@ -42,7 +42,13 @@ for(( i=1; i<$dlOpcji; i++ )); do
 		caleSlowa=true
 	else
 		echo brak opcji ${opcje:$i:1}
+		echo ""
+		echo "wywolanie z opcjami:"
 		echo "podaj <szukana fraze> <opcje poprzedzone jednym myslnikiem> <plik1> <plik2> ..."
+		echo ""
+		echo "wywolanie bez opcji:"
+		echo "podaj <szukana fraze> <myslnik> <plik1> <plik2> ..."
+		echo ""
 		echo "liczenie linii -l"
 		echo "wyswietlanie nazw plikow -n"
 		echo "brak wyswietlania wyniku -q"
@@ -143,6 +149,26 @@ if [ "$caleSlowa" = true ] && [ "$ignoreCase" = false ] && [ "$nazwyPlikow" = fa
 	exit
 fi
 
+if [ $dlOpcji -lt 2 ]; then
+touch plikDoLiczeniaLinii
+
+	for (( i=0; i<${#tabPliki[@]}; i++ )); do
+		sed -n "/$pattern/p" ${tabPliki[$i]} >> plikDoLiczeniaLinii
+
+		##if [ "$brakOutput" = true ]; then
+		#Q	if [ ! -s plikDoLiczeniaLinii ]; then
+		#		rm plikDoLiczeniaLinii
+		#		exit 0
+		#	fi
+		#	rm plikDoLiczeniaLinii
+		#	exit
+		#fi
+		cat plikDoLiczeniaLinii
+		echo -n "" > plikDoLiczeniaLinii
+	done
+	rm plikDoLiczeniaLinii
+	exit
+fi
 
 if [ "$caleSlowa" = true ] && [ "$ignoreCase" = true ] ; then
 ilosc=0
@@ -395,3 +421,4 @@ liczba=0
 	rm plikDoLiczeniaLinii
 	exit
 fi
+
